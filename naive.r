@@ -5,8 +5,9 @@ library(dplyr)
 library(tm)
 library(SnowballC)
 library(wordcloud)
+library(gmodels)
 
-setwd("C:/Users/scott/Documents/Projects")
+set.seed(1234501)
 
 # Windows-1252 or CP-1252 (code page 1252) is a single-byte character encoding of the Latin alphabet, 
 # used by default in the legacy components of Microsoft Windows for English and some other Western languages (other languages use different default encodings).
@@ -26,8 +27,6 @@ categories <- data %>%
 data_new <- data %>%
   mutate(flag=ifelse(category %in% c("Banking & Financial Services"),"Yes","No")) %>%
   mutate(no_chars=nchar(job_description))
-
-# ,"Information & Communication Technology"
 
 as.character(data_new$job_description[[1]])
 
@@ -49,11 +48,14 @@ as.character(descriptions_corpus_clean[[1]])
 descriptions_dtm <- DocumentTermMatrix(descriptions_corpus_clean)
 
 
-descriptions_dtm_train <- descriptions_dtm[1:3543, ]
-descriptions_dtm_test <- descriptions_dtm[3544:4725, ]
+ 
+train_sample <- sample(4725,3780)
 
-descriptions_train_labels <- data_new[1:3543, ]$flag
-descriptions_test_labels <- data_new[3544:4725, ]$flag
+descriptions_dtm_train <- descriptions_dtm[train_sample,]
+descriptions_dtm_test <- descriptions_dtm[-train_sample,]
+
+descriptions_train_labels <- data_flagged[train_sample,]$flag
+descriptions_test_labels <- data_flagged[-train_sample,]$flag
 
 prop.table(table(descriptions_train_labels))
 prop.table(table(descriptions_test_labels))
@@ -79,7 +81,6 @@ convert_counts <- function(x) {
   x <- ifelse(x > 0, "Yes", "No")
 }
 
-
 descriptions_train <- as.data.frame(apply(descriptions_dtm_freq_train, MARGIN = 2,
                    convert_counts))
 
@@ -92,21 +93,11 @@ descriptions_classifier <- naiveBayes(descriptions_train, as.factor(descriptions
 
 descriptions_test_pred <- predict(descriptions_classifier, descriptions_test)
 
-library(gmodels)
+
 
 CrossTable(descriptions_test_pred, descriptions_test_labels,
            prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
            dnn = c('predicted', 'actual'))
 
-a <- as.data.frame(cbind(data_new[3544:4725, ]$job_description,data_new[3544:4725, ]$category,descriptions_test_pred)) %>%
-  filter(descriptions_test_pred==2) %>%
-  filter(!(V2 %in% c("Banking & Financial Services"))) %>%
-  select(-c(3)) %>%
-  arrange(V2)
 
-b <- as.data.frame(cbind(data_new[3544:4725, ]$job_description,data_new[3544:4725, ]$category,descriptions_test_pred)) %>%
-  filter(descriptions_test_pred==1) %>%
-  filter((V2 %in% c("Banking & Financial Services"))) %>%
-  select(-c(3)) %>%
-  arrange(V2)
 
